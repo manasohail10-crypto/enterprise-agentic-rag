@@ -1,0 +1,36 @@
+DOMAINS = {
+    "phishing_and_social_engineering": "cybersecurity",
+    "incident_response_basics": "cybersecurity",
+    "ransomware_protection_tips": "cybersecurity",
+    "multi_factor_authentication_guide": "cybersecurity",
+    "emergency_fund_and_budgeting": "finance",
+    "compound_interest_explained": "finance",
+    "credit_score_basics": "finance",
+    "index_funds_for_beginners": "finance",
+    "sleep_hygiene_guide": "health",
+    "balanced_diet_basics": "health",
+    "exercise_for_adults": "health",
+    "hydration_and_health": "health",
+    "docker_containers_basics": "devops",
+    "ci_cd_pipeline_overview": "devops",
+    "git_branching_workflow": "devops",
+    "kubernetes_core_concepts": "devops",
+    "gdpr_key_principles": "privacy",
+    "data_subject_rights": "privacy",
+    "data_breach_notification": "privacy",
+    "cookie_consent_rules": "privacy",
+    "what_is_rag": "ai",
+    "embeddings_and_vector_search": "ai",
+    "chunking_strategies": "ai",
+    "rag_evaluation_guide": "ai",
+    "guardrails_overview": "ai",
+    "langgraph_agents_basics": "ai",
+    "qdrant_basics": "ai",
+    "llm_observability": "ai",
+    "rag_architecture_overview": "ai",
+    "production_rag_checklist": "ai",
+}
+
+
+def get_domain(file_stem):
+    return DOMAINS.get(file_stem, "general")
