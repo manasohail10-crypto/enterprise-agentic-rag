@@ -9,6 +9,23 @@
 name: enterprise-rag
 
 services:
+  # The database that keeps the chat memory (LangGraph checkpoints).
+  # No "ports:" on purpose: only the API (inside the Docker network) talks to it.
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rag_local_password}
+      POSTGRES_DB: rag
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U rag -d rag" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   api:
     build:
       context: .
@@ -16,8 +33,16 @@ services:
     image: enterprise-rag-api:local
     # All keys in .env (GROQ_API_KEY, QDRANT_API_KEY, ...) become environment variables inside this container.
     env_file: .env
+    environment:
+      # This line wins over POSTGRES_URI in your .env file.
+      # Your .env says "localhost", but inside a container "localhost" means the container itself.
+      # Here we point to the "postgres" service above. Your .env stays correct for running without Docker.
+      POSTGRES_URI: postgresql://rag:${POSTGRES_PASSWORD:-rag_local_password}@postgres:5432/rag
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   ui:
@@ -36,3 +61,8 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  # Keeps the database files when you stop the containers.
+  # "docker compose down" keeps this data. "docker compose down -v" deletes it.
+  pgdata:
