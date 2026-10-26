@@ -1,0 +1,53 @@
+# Dockerfile.ui  ->  the Streamlit chat page image
+#
+# Build it from the project root:
+#   docker build -f Dockerfile.ui -t enterprise-rag-ui:local .
+#
+# The UI only calls the API over HTTP, so this image is small:
+# it has streamlit, requests and python-dotenv, and none of the AI packages.
+
+# Use the same Python version you use on your PC. Check it with: python --version
+ARG PYTHON_VERSION=3.12
+
+
+# ---------- Stage 1: builder ----------
+FROM python:${PYTHON_VERSION}-slim AS builder
+
+ENV PIP_NO_CACHE_DIR=1 \
+  PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+WORKDIR /build
+COPY requirements-ui.txt requirements.lock.txt ./
+RUN pip install -r requirements-ui.txt -c requirements.lock.txt
+
+
+# ---------- Stage 2: runtime ----------
+FROM python:${PYTHON_VERSION}-slim AS runtime
+
+ENV PYTHONUNBUFFERED=1 \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PATH="/opt/venv/bin:${PATH}"
+
+RUN groupadd --system --gid 10001 app \
+  && useradd --system --uid 10001 --gid app --home-dir /app --shell /usr/sbin/nologin app \
+  && mkdir -p /app \
+  && chown app:app /app
+
+WORKDIR /app
+
+COPY --from=builder /opt/venv /opt/venv
+# .streamlit/config.toml holds your colours (theme), Streamlit reads it from /app/.streamlit
+COPY --chown=app:app .streamlit/ ./.streamlit/
+COPY --chown=app:app ui/ ./ui/
+
+USER app
+EXPOSE 8501
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=4)"
+
+# The code uses plain imports like "import styles", so the app file must be started as ui/app.py.
+CMD ["streamlit", "run", "ui/app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]

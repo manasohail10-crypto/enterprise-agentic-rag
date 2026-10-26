@@ -1,0 +1,38 @@
+# docker-compose.yml  ->  starts the whole app (API + chat page) with one command
+#
+#   docker compose up --build -d     build and start
+#   docker compose logs -f api       watch the API logs
+#   docker compose down              stop and remove the containers
+#
+# Needs a ".env" file next to this file (your secret keys). The .env is NOT copied into the images.
+
+name: enterprise-rag
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: enterprise-rag-api:local
+    # All keys in .env (GROQ_API_KEY, QDRANT_API_KEY, ...) become environment variables inside this container.
+    env_file: .env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    image: enterprise-rag-ui:local
+    # The UI gets only what it needs. It does NOT get your other secret keys.
+    # Inside the Docker network the API is reached by its service name: "api".
+    environment:
+      RAG_API_URL: http://api:8000
+      API_KEY: ${API_KEY:-}
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

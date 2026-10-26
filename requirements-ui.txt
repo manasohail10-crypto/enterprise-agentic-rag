@@ -1,0 +1,7 @@
+# Packages for the Streamlit UI image (used by Dockerfile.ui).
+# The UI only shows a chat page and calls the API over HTTP,
+# so it does not need torch, langchain, qdrant and the other heavy packages.
+
+streamlit==1.60.0
+requests>=2.32
+python-dotenv>=1.0
