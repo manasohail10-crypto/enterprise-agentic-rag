@@ -56,7 +56,8 @@ def initialize_rails():
     indicators = list(RAIL_INDICATORS) + derive_indicators(colang.text)
 
     logfire.info(
-        "guardrails ready",
+        "guardrails ready: rules version {colang_version} from {colang_source}, "
+        "settings version {yaml_version} from {yaml_source}",
         colang_version=colang.version,
         colang_source=colang.source,
         yaml_version=yaml.version,

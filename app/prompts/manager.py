@@ -1,3 +1,16 @@
+"""Loads prompts from Langfuse, and falls back to the local copy when it cannot.
+
+How it behaves:
+  - Keys not set            -> uses the local prompts, never calls the internet.
+  - Langfuse works          -> uses the version that has the label "production"
+                               (Langfuse keeps it for 60 seconds, so changes go live within a minute).
+  - Langfuse is down        -> uses the local prompts, and does not retry that prompt for 2 minutes,
+                               so users are not slowed down. The prompts are also loaded once when the
+                               API starts (warm_up), so a slow Langfuse is felt at start-up, not by users.
+  - A bad version in Langfuse (a needed {{variable}} is missing, or a new unknown one appears)
+                            -> ignores it and uses the local prompt, and writes a warning.
+"""
+
 import re
 import threading
 import time
@@ -123,7 +136,14 @@ def note_version(name, version, source):
     """Writes one log line each time the version in use changes (not on every request)."""
     if _last_logged.get(name) != (version, source):
         _last_logged[name] = (version, source)
-        logfire.info("prompt in use", prompt=name, version=version, source=source, label=setting.PROMPT_LABEL)
+        # The details are inside the message text, because the console log shows only the message.
+        logfire.info(
+            "prompt in use: {prompt} version {version} from {source}",
+            prompt=name,
+            version=version,
+            source=source,
+            label=setting.PROMPT_LABEL,
+        )
 
 
 def load_prompt(name, **variables):
