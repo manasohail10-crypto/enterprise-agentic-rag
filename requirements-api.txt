@@ -58,3 +58,5 @@ prometheus-client>=0.21
 prometheus-fastapi-instrumentator>=7.0
 
 tavily-python
+
+langfuse>=4.0.0,<5

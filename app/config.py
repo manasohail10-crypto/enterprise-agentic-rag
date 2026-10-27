@@ -23,6 +23,11 @@ class Setting(BaseSettings):
     TAVILY_MAX_RESULTS: int = 3
     RERANK_MIN_SCORE: float = 0.22
 
+    LANGFUSE_PUBLIC_KEY: str | None = None
+    LANGFUSE_SECRET_KEY: str | None = None
+    LANGFUSE_BASE_URL: str = "https://cloud.langfuse.com"
+    PROMPT_LABEL: str = "production"
+
     QDRANT_COLLECTION: str = "enterprise_rag"
     GROQ_MODEL: str = "openai/gpt-oss-20b"
     GEMINI_MODEL: str = "gemini-3.1-flash-lite"

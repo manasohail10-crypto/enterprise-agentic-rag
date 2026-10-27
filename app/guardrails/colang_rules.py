@@ -1,3 +1,5 @@
+import re
+
 COLANG_CONTENT = """
 define user ask off topic
   "tell me a joke"
@@ -338,3 +340,65 @@ RAIL_INDICATORS = [
     "You are welcome! Ask me another question any time",
     "Goodbye! Come back any time you have more questions",
 ]
+
+BOT_MESSAGE = re.compile(r'^define bot .+\n  "(.+)"$', re.MULTILINE)
+
+
+def derive_indicators(colang_text):
+    """Makes an indicator from the start of every bot message in the Colang text.
+
+    Why: the rules can now be edited in Langfuse. If someone changes a refusal message there,
+    the old RAIL_INDICATORS would no longer match it and the refusal would be missed.
+    guard() uses RAIL_INDICATORS plus these new ones, so it is never worse than before.
+    """
+    indicators = []
+    for message in BOT_MESSAGE.findall(colang_text):
+        if message == "PASS_TO_AGENT":
+            continue
+        indicators.append(message[:40])
+    return indicators
+
+# These flows protect the app. A version of the rules that loses one of them is not accepted.
+REQUIRED_FLOWS = {
+    "handle off topic",
+    "jailbreak protection",
+    "harmful request protection",
+    "personal advice protection",
+    "pass to agent",
+}
+
+
+def validate_colang(colang_text):
+    """Checks Colang text that came from outside (Langfuse). Returns a list of problems, empty when it is fine.
+
+    NeMo Guardrails accepts some broken rules without any error (for example plain random text,
+    or a flow that points to a bot message that does not exist), and the guardrails would then
+    silently do nothing. So we check this ourselves, with the same idea as check_rules.py.
+    """
+    users = set(re.findall(r"^define user (.+)$", colang_text, re.MULTILINE))
+    bots = set(re.findall(r"^define bot (.+)$", colang_text, re.MULTILINE))
+    flow_names = set(re.findall(r"^define flow (.+)$", colang_text, re.MULTILINE))
+    flows = re.findall(r"^define flow (.+)\n  user (.+)\n  bot (.+)$", colang_text, re.MULTILINE)
+
+    problems = []
+    for name in sorted(REQUIRED_FLOWS - flow_names):
+        problems.append(f"missing the flow '{name}'")
+    for name, user, bot in flows:
+        if user not in users:
+            problems.append(f"flow '{name}' uses the user type '{user}' that is not defined")
+        if bot not in bots:
+            problems.append(f"flow '{name}' uses the bot message '{bot}' that is not defined")
+    return problems
+
+
+def validate_yaml(yaml_text):
+    """Checks the YAML settings text that came from outside. Returns a list of problems."""
+    import yaml
+
+    try:
+        data = yaml.safe_load(yaml_text)
+    except yaml.YAMLError as error:
+        return [f"the YAML cannot be read: {error}"]
+    if not isinstance(data, dict):
+        return ["the YAML is not a settings block"]
+    return [f"the YAML has no '{key}' section" for key in ("instructions", "rails") if key not in data]

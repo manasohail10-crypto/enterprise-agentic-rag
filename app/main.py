@@ -5,6 +5,7 @@ import logfire
 from app.agents.graph import build_graph
 from app.config import setting
 from app.guardrails import guard, initialize_rails
+from app.prompts import warm_up
 from app.request_context import set_request_id
 from app.services.health.connection_checker import check_all_connections, log_connection_summary
 
@@ -19,6 +20,7 @@ def start(strict=False):
     logfire.configure(token=setting.LOGFIRE_TOKEN, send_to_logfire="if-token-present")
 
     initialize_rails()
+    warm_up()
     graph = build_graph()
 
     results = check_all_connections()
