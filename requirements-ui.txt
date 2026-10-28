@@ -5,4 +5,3 @@
 streamlit==1.60.0
 requests>=2.32
 python-dotenv>=1.0
-Pillow>=13.0.0
