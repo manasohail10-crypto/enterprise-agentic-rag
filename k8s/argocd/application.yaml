@@ -1,0 +1,25 @@
+# Step 12: tells ArgoCD "keep the cluster the same as the folder k8s/ in my GitHub repo".
+# Apply it once:   kubectl apply -f k8s/argocd/application.yaml
+# After that, the way to change the cluster is a git push (not kubectl).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: enterprise-rag
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io # deleting this Application also deletes the app it made
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/manasohail10-crypto/enterprise-agentic-rag.git
+    targetRevision: ci-test
+    path: k8s # ArgoCD finds k8s/kustomization.yaml here and builds it
+  destination:
+    server: https://kubernetes.default.svc # this same cluster
+    namespace: enterprise-rag
+  syncPolicy:
+    automated:
+      prune: true # a file removed from git is removed from the cluster
+      selfHeal: true # a change made by hand with kubectl is undone
+    syncOptions:
+      - CreateNamespace=true
