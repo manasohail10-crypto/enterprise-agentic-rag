@@ -2,6 +2,8 @@
 # The UI only shows a chat page and calls the API over HTTP,
 # so it does not need torch, langchain, qdrant and the other heavy packages.
 
-streamlit==1.60.0
+
+streamlit==1.66.1
 requests>=2.32
 python-dotenv>=1.0
+Pillow==13.0.0

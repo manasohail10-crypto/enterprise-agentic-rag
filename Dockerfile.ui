@@ -20,9 +20,8 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
 WORKDIR /build
-COPY requirements-ui.txt requirements.lock.txt ./
-RUN pip install -r requirements-ui.txt -c requirements.lock.txt
-
+COPY requirements-ui.txt ./
+RUN pip install -r requirements-ui.txt
 
 # ---------- Stage 2: runtime ----------
 FROM python:${PYTHON_VERSION}-slim AS runtime

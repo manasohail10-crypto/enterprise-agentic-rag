@@ -1,0 +1,18 @@
+# Packages the CI pipeline installs to run the tests (.github/workflows/ci-cd.yml).
+#
+# This is a SMALL list on purpose. The tests never call a real service, so the CI does not need
+# torch (big), streamlit, qdrant, langgraph and so on. This makes the test job take about 1 minute.
+# The exact versions come from requirements.lock.txt (the pipeline installs with "-c requirements.lock.txt").
+#
+# If a new test imports a new package, add it here.
+
+pytest
+pydantic>=2.13,<3
+pydantic-settings>=2.0
+logfire==4.39.0
+langfuse>=4.0.0,<5
+nemoguardrails==0.24.1
+langchain-core==1.6.12
+langchain-openai==1.7.2
+openai
+portkey-ai==2.3.4

@@ -1,0 +1,215 @@
+# CI/CD pipeline for Enterprise RAG
+#
+#   STEP 5  lint + test         check the code on every push and pull request
+#   STEP 6  trivy-repo + image  scan the files and the built images for security problems
+#   STEP 7  publish             push the images to DockerHub (only from main, only if everything above is green)
+#
+# Picture in words:
+#
+#   lint ----\
+#   test -----+--> publish   (runs only on push to main, or on a version tag like v1.0.0)
+#   trivy-repo+
+#   image ----/    (build + scan, for api and ui)
+#
+# SAFETY RULES used in this file:
+#   1. Every action is pinned to an exact commit code (the long hex number), not to a version name.
+#      A version name can be moved by whoever owns the action. In March 2026 the Trivy action was
+#      attacked exactly like this. A commit code cannot be moved.
+#   2. The DockerHub token exists ONLY in the "publish" job (through the GitHub Environment "dockerhub").
+#      The jobs that run third-party tools (Trivy) never see it.
+#   3. Pull requests never push anything.
+
+name: CI-CD
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # the "Run workflow" button in the Actions tab
+  schedule:
+    - cron: "0 3 * * 1" # every Monday: new security problems are found every day, even when the code did not change
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  # The Trivy scan FAILS the pipeline for problems of this level (that already have a fix).
+  # HIGH problems are still printed in the log, they just do not stop the pipeline.
+  # When you are ready to be stricter, change it to "HIGH,CRITICAL".
+  TRIVY_BLOCK_ON: CRITICAL
+
+jobs:
+  # ===================================================================== STEP 5: CI
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install ruff (same version as requirements.lock.txt)
+        run: pip install ruff==0.17.2
+      - name: Check the code
+        run: ruff check . --output-format=github
+
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12" # the same Python as the Dockerfile
+          cache: pip
+          cache-dependency-path: |
+            requirements-ci.txt
+            requirements.lock.txt
+      - name: Install packages
+        run: pip install -r requirements-ci.txt -c requirements.lock.txt
+      - name: Run the tests
+        run: python -m pytest tests -v
+
+  # ===================================================================== STEP 6a: scan the files
+  trivy-repo:
+    name: Trivy (files)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Looks for: passwords or keys written inside files (secret) and
+      # dangerous settings in the Dockerfiles (misconfig).
+      - name: Scan the project files
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 (the safe release)
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: .trivyignore
+          version: v0.69.3
+
+  # ===================================================================== STEP 6b: build + scan the images
+  image:
+    name: Build and scan (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: Dockerfile
+          - name: ui
+            dockerfile: Dockerfile.ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Build the image on the runner (no push). The cache makes the next builds much faster.
+      - name: Build the image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          load: true
+          push: false
+          tags: enterprise-rag-${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      # Report: show every HIGH and CRITICAL problem in the log (does not stop the pipeline).
+      - name: Trivy report (HIGH and CRITICAL)
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 (the safe release)
+        with:
+          image-ref: enterprise-rag-${{ matrix.name }}:ci
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+          trivyignores: .trivyignore
+          version: v0.69.3
+
+      # Gate: stop the pipeline if a problem of the level TRIVY_BLOCK_ON is found and a fix exists.
+      - name: Trivy gate (${{ env.TRIVY_BLOCK_ON }} with a fix)
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 (the safe release)
+        with:
+          image-ref: enterprise-rag-${{ matrix.name }}:ci
+          scanners: vuln
+          severity: ${{ env.TRIVY_BLOCK_ON }}
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+          version: v0.69.3
+
+  # ===================================================================== STEP 7: push to DockerHub
+  publish:
+    name: Push to DockerHub (${{ matrix.name }})
+    needs: [lint, test, trivy-repo, image]
+    # Only for a push to main or a version tag. Never for pull requests or the weekly scan.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    # The secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN live in this Environment, so only this job can read them.
+    environment: dockerhub
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            dockerfile: Dockerfile
+          - name: ui
+            dockerfile: Dockerfile.ui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Makes the image names and tags:
+      #   push to main      ->  latest  and  sha-1a2b3c4
+      #   tag v1.2.3        ->  1.2.3   and  1.2  and  sha-1a2b3c4
+      - name: Make the tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/enterprise-rag-${{ matrix.name }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # The layers are already in the cache from the "image" job, so this build is fast.
+      - name: Build and push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          provenance: false
+          sbom: false

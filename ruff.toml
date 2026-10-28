@@ -1,0 +1,6 @@
+# Settings for ruff, the code checker (used by the CI pipeline: .github/workflows/ci-cd.yml).
+# These rules find real mistakes only: broken syntax (E9), bad statements (E7),
+# bad imports (E4) and unused or missing names (F).
+# We do not force a code style, so the first CI run does not fail on taste.
+[lint]
+select = ["E4", "E7", "E9", "F"]
