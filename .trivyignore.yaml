@@ -1,0 +1,18 @@
+# Trivy ignore list. Use it ONLY for a finding you checked and decided to accept.
+# Always write the reason (statement) and a date to look at it again.
+#
+# To ignore a security hole in a package, add it under "vulnerabilities", for example:
+#   vulnerabilities:
+#     - id: CVE-2025-12345
+#       statement: "The bug is in a feature we do not use. Review again on 2026-12-01."
+
+misconfigurations:
+  # "Root file system is not read-only" for the API and the UI.
+  # Streamlit and the API write small files to their home folder at start-up. Making the whole disk
+  # read-only without a test could make the pods crash. We will try it later, with emptyDir folders.
+  # Postgres already has a read-only root file system.
+  - id: KSV-0014
+    paths:
+      - k8s/api.yaml
+      - k8s/ui.yaml
+    statement: "Accepted for now. Review again after Step 12."

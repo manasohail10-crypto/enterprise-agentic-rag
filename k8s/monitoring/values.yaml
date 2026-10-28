@@ -1,0 +1,53 @@
+# Settings for the Helm chart "kube-prometheus-stack" (Prometheus + Grafana + Alertmanager + ready dashboards).
+# Used in Step 11:
+#   helm upgrade --install monitoring prometheus-community/kube-prometheus-stack --version 92.10.0 -n monitoring --create-namespace -f k8s/monitoring/values.yaml
+#
+# These settings make it small enough for a PC and remove parts that do not work on Docker Desktop.
+
+# Prometheus must read OUR ServiceMonitor, dashboard and alert files (not only the ones made by this chart).
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    retention: 3d
+    scrapeInterval: 30s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 400Mi
+      limits:
+        memory: 1Gi
+
+grafana:
+  defaultDashboardsTimezone: browser
+
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 768Mi
+# Alertmanager sends alert messages (email, Slack ...). We have nowhere to send them yet,
+# so it stays off. Alerts are still visible in Prometheus and Grafana.
+alertmanager:
+  enabled: false
+
+# The parts below are not reachable (or not working) on a Docker Desktop cluster.
+# Left on, they would only show red "down" targets.
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeProxy:
+  enabled: false
+nodeExporter:
+  enabled: false

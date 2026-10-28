@@ -1,0 +1,57 @@
+# Alert rules. Prometheus checks them all the time. When a rule is true for the time written in "for",
+# the alert turns red in Prometheus (Alerts page) and in Grafana.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rag-alerts
+  namespace: monitoring
+  labels:
+    app: api
+spec:
+  groups:
+    - name: enterprise-rag
+      rules:
+        - alert: RagApiDown
+          expr: sum(kube_deployment_status_replicas_available{namespace="enterprise-rag",deployment="api"}) < 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "The API has no ready pod"
+            description: "No api pod has been ready for 2 minutes. Run: kubectl -n enterprise-rag get pods"
+        - alert: RagHighErrorRate
+          expr: >
+            sum(rate(rag_requests_total{status="error"}[5m])) / clamp_min(sum(rate(rag_requests_total[5m])), 0.001) > 0.1
+            and sum(rate(rag_requests_total[5m])) > 0.01
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "More than 10 percent of questions fail"
+            description: "Look at the API logs: kubectl -n enterprise-rag logs deploy/api --tail=50"
+        - alert: RagSlowAnswers
+          expr: histogram_quantile(0.95, sum(rate(rag_request_duration_seconds_bucket[5m])) by (le)) > 15
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "95 percent of answers take longer than 15 seconds"
+            description: "The LLM or the search service may be slow."
+        - alert: RagPodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="enterprise-rag"}[15m]) > 2
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "A pod restarted more than 2 times in 15 minutes"
+            description: "Run: kubectl -n enterprise-rag describe pod"
+        - alert: RagApiNearMemoryLimit
+          expr: >
+            max(container_memory_working_set_bytes{namespace="enterprise-rag",container="api"})
+            / max(kube_pod_container_resource_limits{namespace="enterprise-rag",container="api",resource="memory"}) > 0.9
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "The API uses more than 90 percent of its memory limit"
+            description: "Raise the memory limit in k8s/api.yaml before the pod is killed (OOMKilled)."

@@ -1,0 +1,6 @@
+# A namespace is a separate "room" inside the cluster. Everything of this project lives in it,
+# so you can delete the whole project with one command: kubectl delete namespace enterprise-rag
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: enterprise-rag

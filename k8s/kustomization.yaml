@@ -1,0 +1,18 @@
+# Kustomize puts all the files together, so ONE command deploys everything:
+#     kubectl apply -k k8s/
+# It also keeps the image tags in ONE place (section "images").
+# Step 10 (rollbacks) and Step 12 (ArgoCD) change only these two tag lines.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - api.yaml
+  - ui.yaml
+
+images:
+  - name: anassohail22/enterprise-rag-api
+    newTag: latest
+  - name: anassohail22/enterprise-rag-ui
+    newTag: latest

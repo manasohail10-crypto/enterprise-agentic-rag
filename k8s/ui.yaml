@@ -1,0 +1,88 @@
+# The Streamlit chat page. It only talks to the API Service (it never gets your other secret keys).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui
+  namespace: enterprise-rag
+  labels:
+    app: ui
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ui
+  template:
+    metadata:
+      labels:
+        app: ui
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ui
+          image: anassohail22/enterprise-rag-ui # the tag is set in k8s/kustomization.yaml
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8501
+          env:
+            - name: RAG_API_URL
+              value: http://api:8000
+            - name: API_KEY # only the API_KEY, and only if it exists in your .env (optional: true)
+              valueFrom:
+                secretKeyRef:
+                  name: rag-env
+                  key: API_KEY
+                  optional: true
+          startupProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui
+  namespace: enterprise-rag
+  labels:
+    app: ui
+spec:
+  selector:
+    app: ui
+  ports:
+    - name: http
+      port: 8501
+      targetPort: http

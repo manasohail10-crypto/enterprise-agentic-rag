@@ -1,0 +1,105 @@
+# The database for the chat memory (LangGraph checkpoints). Same settings as docker-compose.yml.
+# A StatefulSet is used (not a Deployment) because a database needs its own disk that stays when the pod restarts.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: enterprise-rag
+  labels:
+    app: postgres
+spec:
+  clusterIP: None # "headless": the name "postgres" points straight to the pod
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: enterprise-rag
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70 # the "postgres" user inside the postgres:alpine image
+        runAsGroup: 70
+        fsGroup: 70 # makes the disk writable for that user
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: rag
+            - name: POSTGRES_DB
+              value: rag
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth # made with a command, see the guide (the password is never written in a file)
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA # a sub-folder, because the disk root can contain a "lost+found" folder that Postgres rejects
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "rag", "-d", "rag"]
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "rag", "-d", "rag"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true # the container cannot change its own files, only the folders mounted below
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: run # Postgres writes a small socket file here
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

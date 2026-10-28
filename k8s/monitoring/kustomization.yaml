@@ -1,0 +1,6 @@
+# Applies our monitoring files. Run it AFTER the Helm install (it needs the Prometheus CRDs the chart installs):
+#     kubectl apply -k k8s/monitoring/
+resources:
+  - api-servicemonitor.yaml
+  - alerts.yaml
+  - dashboard.yaml

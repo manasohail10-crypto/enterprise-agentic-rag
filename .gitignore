@@ -36,3 +36,5 @@ Thumbs.db
 node_modules/
 DATA/
 processed_data/
+#
+k8s/*secret*.yaml

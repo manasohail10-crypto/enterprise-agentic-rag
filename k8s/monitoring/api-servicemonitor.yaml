@@ -1,0 +1,22 @@
+# Tells Prometheus: "scrape (read) the numbers at http://api:8000/metrics every 15 seconds".
+# The API already shows these numbers (prometheus-fastapi-instrumentator and the rag_* counters in app/api.py).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rag-api
+  namespace: monitoring
+  labels:
+    app: api
+spec:
+  namespaceSelector:
+    matchNames:
+      - enterprise-rag
+  selector:
+    matchLabels:
+      app: api # the label on the Service "api" (k8s/api.yaml)
+  endpoints:
+    - port: http # the port NAME in the Service
+      path: /metrics
+      interval: 15s
+
+      

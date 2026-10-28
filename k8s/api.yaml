@@ -1,0 +1,104 @@
+# The API (FastAPI + LangGraph agent). The image comes from DockerHub (built by the Step 7 pipeline).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: enterprise-rag
+  labels:
+    app: api
+spec:
+  replicas: 1
+  # How an update is done: start 1 new pod first, remove the old pod only when the new one is ready.
+  # So users never see downtime, and a broken new version never replaces a working one.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001 # the "app" user inside the image (see Dockerfile)
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          # The tag is set in k8s/kustomization.yaml (section "images"), not here.
+          image: anassohail22/enterprise-rag-api
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+          # All keys of your .env file (GROQ_API_KEY, QDRANT_API_KEY, ...) come from the Secret "rag-env".
+          envFrom:
+            - secretRef:
+                name: rag-env
+          env:
+            # These two lines win over POSTGRES_URI inside rag-env.
+            # (Your .env says "localhost", but inside Kubernetes the database is the Service called "postgres".)
+            # The order matters: POSTGRES_PASSWORD must be defined BEFORE the line that uses $(POSTGRES_PASSWORD).
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_URI
+              value: postgresql://rag:$(POSTGRES_PASSWORD)@postgres:5432/rag
+          # startupProbe: gives the API up to 3 minutes to start (it checks its connections at start-up).
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          # livenessProbe: "is the process alive?" If not, Kubernetes restarts the pod.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # readinessProbe: "can it serve users now?" If not, the pod gets no traffic (and a bad update is not rolled out).
+          # /ready checks the outside services (Qdrant, Postgres ...). The API keeps the answer for 60 seconds,
+          # so this probe is cheap.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              memory: 3Gi # if "kubectl describe pod" shows OOMKilled, raise this number
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api # the UI calls http://api:8000, the same name as in docker-compose.yml
+  namespace: enterprise-rag
+  labels:
+    app: api
+spec:
+  selector:
+    app: api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
