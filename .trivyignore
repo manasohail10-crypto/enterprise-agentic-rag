@@ -1,0 +1,6 @@
+# Trivy ignore list. One security ID per line (for example CVE-2025-12345).
+# Use it ONLY for a finding you checked and decided to accept. Write the reason and a date above the line.
+#
+# Example:
+# Reason: the bug is in a feature we do not use. Review again on 2026-12-01.
+# CVE-2025-12345

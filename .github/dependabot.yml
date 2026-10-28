@@ -1,0 +1,9 @@
+# Dependabot keeps the GitHub Actions in .github/workflows up to date.
+# Our workflow pins every action to an exact commit code (safer than a version name that can be moved).
+# Dependabot opens a pull request when a new version is out, so the pins do not get old.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
