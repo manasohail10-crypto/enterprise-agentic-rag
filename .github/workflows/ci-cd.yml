@@ -91,7 +91,7 @@ jobs:
       # Looks for: passwords or keys written inside files (secret) and
       # dangerous settings in the Dockerfiles (misconfig).
       - name: Scan the project files
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 (the safe release)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.35.0 (the safe release)
         with:
           scan-type: fs
           scan-ref: .
@@ -134,7 +134,7 @@ jobs:
 
       # Report: show every HIGH and CRITICAL problem in the log (does not stop the pipeline).
       - name: Trivy report (HIGH and CRITICAL)
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 (the safe release)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.35.0 (the safe release)
         with:
           image-ref: enterprise-rag-${{ matrix.name }}:ci
           scanners: vuln
@@ -146,7 +146,7 @@ jobs:
 
       # Gate: stop the pipeline if a problem of the level TRIVY_BLOCK_ON is found and a fix exists.
       - name: Trivy gate (${{ env.TRIVY_BLOCK_ON }} with a fix)
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 (the safe release)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.35.0 (the safe release)
         with:
           image-ref: enterprise-rag-${{ matrix.name }}:ci
           scanners: vuln
