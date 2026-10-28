@@ -98,7 +98,7 @@ jobs:
           scanners: secret,misconfig
           severity: HIGH,CRITICAL
           exit-code: "1"
-          trivyignores: .trivyignore
+          trivyignores: .trivyignore.yaml
           version: v0.69.3
 
   # ===================================================================== STEP 6b: build + scan the images
@@ -141,7 +141,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "0"
-          trivyignores: .trivyignore
+          trivyignores: .trivyignore.yaml
           version: v0.69.3
 
       # Gate: stop the pipeline if a problem of the level TRIVY_BLOCK_ON is found and a fix exists.
@@ -153,7 +153,7 @@ jobs:
           severity: ${{ env.TRIVY_BLOCK_ON }}
           ignore-unfixed: true
           exit-code: "1"
-          trivyignores: .trivyignore
+          trivyignores: .trivyignore.yaml
           version: v0.69.3
 
   # ===================================================================== STEP 7: push to DockerHub
