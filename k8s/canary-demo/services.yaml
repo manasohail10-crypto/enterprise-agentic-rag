@@ -1,0 +1,26 @@
+# "web" sends users to ALL pods (old and new). "web-canary" sends only to the new pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: canary-demo
+spec:
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-canary
+  namespace: canary-demo
+spec:
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

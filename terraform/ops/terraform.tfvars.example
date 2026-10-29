@@ -1,0 +1,10 @@
+# Copy this file to terraform.tfvars and fill in YOUR values. (terraform.tfvars is ignored by git.)
+# Your IP: https://checkip.amazonaws.com   -> write it with /32 at the end.
+my_ip_cidr = "203.0.113.25/32"
+
+# Set to false if you already made the GitHub OIDC provider by hand in Step 14 and did not delete it.
+create_github_oidc_provider = true
+
+# Save money: set false for a server you do not need now.
+create_app_server = true
+create_ci_server  = true

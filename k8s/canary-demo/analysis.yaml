@@ -1,0 +1,18 @@
+# The check: call the NEW pods 3 times, 10 seconds apart.
+# The web provider treats any answer that is not 2xx (200, 201 ...) as an error.
+# One error is allowed. The second error aborts the update and the old version stays.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: web-ok
+  namespace: canary-demo
+spec:
+  metrics:
+    - name: web-answers
+      interval: 10s
+      count: 3
+      failureLimit: 1
+      provider:
+        web:
+          url: http://web-canary.canary-demo.svc.cluster.local/
+          timeoutSeconds: 5

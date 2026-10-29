@@ -1,0 +1,30 @@
+# Step 18: ArgoCD on the EKS cluster. It watches deploy/eks in GitHub.
+# Apply once on EKS:   kubectl apply -f k8s/argocd/application-eks.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: enterprise-rag
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/manasohail10-crypto/enterprise-agentic-rag.git
+    targetRevision: main
+    path: deploy/eks
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: enterprise-rag
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  # Argo Rollouts changes the Rollout while it runs a canary. ArgoCD must not "heal" those changes.
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Rollout
+      jsonPointers:
+        - /spec/replicas

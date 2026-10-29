@@ -1,0 +1,52 @@
+# Step 17: a small practice app to learn canary deployment safely on Docker Desktop.
+# It uses the public nginx web server, so it needs no secrets and no database.
+# It is NOT part of the real app. Delete the namespace when you finish:  kubectl delete ns canary-demo
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: web
+  namespace: canary-demo
+spec:
+  replicas: 4
+  revisionHistoryLimit: 2
+  progressDeadlineSeconds: 60 # short on purpose, so a broken update is aborted fast
+  progressDeadlineAbort: true
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+  strategy:
+    canary:
+      canaryService: web-canary # points only to the NEW pods
+      maxSurge: 1
+      maxUnavailable: 0
+      steps:
+        - setWeight: 25 # 1 of 4 pods runs the new version
+        - analysis:
+            templates:
+              - templateName: web-ok
+        - pause: {} # waits here until YOU promote (so you can look). Remove this line for a fully automatic rollout.
+        - setWeight: 50
+        - analysis:
+            templates:
+              - templateName: web-ok
+        - pause: { duration: 10s }

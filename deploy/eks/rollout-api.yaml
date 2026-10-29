@@ -1,0 +1,97 @@
+# The API as an Argo Rollout (Step 18). It replaces the normal Deployment "api" from k8s/api.yaml.
+# A Rollout is a Deployment with a smarter update: it moves a few pods to the new version, CHECKS them,
+# and only then goes on. If the check fails, it goes back to the old version by itself.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: api
+  namespace: enterprise-rag
+  labels:
+    app: api
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  # If the new pods are not ready after 5 minutes, the update is aborted and the old version stays.
+  progressDeadlineSeconds: 300
+  progressDeadlineAbort: true
+  strategy:
+    canary:
+      # A Service that points ONLY to the new (canary) pods. The check below calls it.
+      canaryService: api-canary
+      maxSurge: 1
+      maxUnavailable: 0
+      steps:
+        # 3 pods in total: 1 of 3 = 33 percent of the pods run the new version.
+        - setWeight: 33
+        - analysis:
+            templates:
+              - templateName: api-ready
+        - setWeight: 66
+        - analysis:
+            templates:
+              - templateName: api-ready
+        - pause: { duration: 30s }
+        # after the last step the new version gets 100 percent
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          # newName and newTag are set in kustomization.yaml (section "images").
+          image: anassohail22/enterprise-rag-api
+          imagePullPolicy: IfNotPresent # tags are unique (j12-ab12cd3), so a pulled image never changes
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: rag-env
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_URI
+              value: postgresql://rag:$(POSTGRES_PASSWORD)@postgres:5432/rag
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              memory: 3Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

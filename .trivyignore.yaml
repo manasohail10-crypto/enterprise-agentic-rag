@@ -16,3 +16,20 @@ misconfigurations:
       - k8s/api.yaml
       - k8s/ui.yaml
     statement: "Accepted for now. Review again after Step 12."
+  
+  
+  # Terraform (Step 15). Both were checked and accepted:
+  # AWS-0031: Jenkins tags are unique (j12-ab12cd3), but the Step 14 GitHub job also pushes the moving tag "latest".
+  #           IMMUTABLE tags would make that push fail. Review again if you remove the GitHub ECR job.
+  - id: AWS-0031
+    paths:
+      - terraform/ops/ecr.tf
+    statement: "Accepted: the GitHub ECR job pushes the tag latest. Review when that job is removed."
+  # AWS-0104: the servers must reach package repositories, ECR, GitHub and Docker Hub, and those IP addresses change.
+  #           Nobody from the internet can come IN (see the inbound rules: only your IP and GitHub webhook IPs).
+  - id: AWS-0104
+    paths:
+      - terraform/ops/security.tf
+    statement: "Accepted: outgoing traffic must be open for updates and image pulls."
+
+

@@ -1,0 +1,4 @@
+# Linux reads these files, so they must use Linux line endings (LF), also when saved on Windows.
+*.sh text eol=lf
+Jenkinsfile text eol=lf
+jenkins/** text eol=lf

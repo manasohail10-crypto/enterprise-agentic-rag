@@ -1,0 +1,58 @@
+# Jenkins + SonarQube on the CI server (Step 16).
+# Start:  cd /opt/ci/jenkins && docker compose up -d --build
+# The project name is fixed to "ci", so the network is called "ci_default" (the Jenkinsfile uses this name).
+name: ci
+
+services:
+  jenkins:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    # The container may use the docker of the server (the socket). Its group number comes from jenkins/.env.
+    group_add:
+      - "${DOCKER_GID}"
+    environment:
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-south-1}
+    volumes:
+      # SAME path inside and outside, so docker commands started by Jenkins can find the project files.
+      - /var/jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  sonarqube:
+    image: sonarqube:community
+    restart: unless-stopped
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:-sonar-local-only}
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_extensions:/opt/sonarqube/extensions
+      - sonar_logs:/opt/sonarqube/logs
+
+  sonar-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD:-sonar-local-only}
+      POSTGRES_DB: sonar
+    volumes:
+      - sonar_db:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U sonar -d sonar" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  sonar_data:
+  sonar_extensions:
+  sonar_logs:
+  sonar_db:

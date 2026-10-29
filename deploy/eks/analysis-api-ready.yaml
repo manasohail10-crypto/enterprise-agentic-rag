@@ -1,0 +1,20 @@
+# The "check" of the canary. It calls /ready on the NEW pods only (through api-canary).
+# /ready answers {"status":"ready"} when the API can reach Qdrant, Postgres and the other services.
+# It runs 4 times, 15 seconds apart. One failure is allowed (a short network problem). The second failure aborts the update.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: api-ready
+  namespace: enterprise-rag
+spec:
+  metrics:
+    - name: ready
+      interval: 15s
+      count: 4
+      failureLimit: 1
+      successCondition: result == "ready"
+      provider:
+        web:
+          url: http://api-canary.enterprise-rag.svc.cluster.local:8000/ready
+          jsonPath: "{$.status}"
+          timeoutSeconds: 10

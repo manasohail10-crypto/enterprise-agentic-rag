@@ -38,3 +38,13 @@ DATA/
 processed_data/
 #
 k8s/*secret*.yaml
+
+# Terraform: state files hold secrets, variable files hold your IP. Never commit them.
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+crash.log
+# Jenkins server file with the docker group number (made by the bootstrap script)
+jenkins/.env

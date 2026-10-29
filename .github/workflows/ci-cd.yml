@@ -99,6 +99,9 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
           trivyignores: .trivyignore.yaml
+          # terraform/eks uses public modules that Trivy would download from the internet and judge with
+          # hundreds of rules. We skip that folder here and read the plan ourselves before "apply".
+          skip-dirs: terraform/eks
           version: v0.69.3
 
   # ===================================================================== STEP 6b: build + scan the images
